@@ -7,7 +7,7 @@ import { openPicker, pickerLabels } from "./pickerOpeners";
 import { syntheticRows } from "./synthetic";
 import { runStream, type StreamOptions } from "./streamDebug";
 import { loadRun, loadSeed, type LoadRunOptions } from "./loadDebug";
-import { workedTurnRows } from "./workedTurn";
+import { workedTurnPageRows, workedTurnRows } from "./workedTurn";
 import { incomingRows } from "./incomingFixture";
 import { linkRows } from "./linkFixture";
 import { organizationRows } from "./organizationFixture";
@@ -151,20 +151,18 @@ export function createAcpmuxDebug(
   return {
     async seedRows(count = 5000, fixture, agents) {
       acpmuxPerf.enable();
+      const fixtures: Record<string, () => AcpmuxRow[]> = {
+        subagents: () => subagentTrayRows(trayStep(count), trayOrigin(count), agents ?? 2),
+        "worked-turn": () => workedTurnRows(Date.now() - 60_000),
+        "worked-turn-page": () => workedTurnPageRows(Date.now() - 60_000),
+        incoming: () => incomingRows(Date.now() - 120_000),
+        link: () => linkRows(Date.now() - 30_000),
+        organization: () => organizationRows(Date.now() - 120_000),
+        shared: () => sharedRows(Date.now() - 720_000),
+      };
       const rows =
-        fixture === "subagents"
-          ? subagentTrayRows(trayStep(count), trayOrigin(count), agents ?? 2)
-          : fixture === "worked-turn"
-            ? workedTurnRows(Date.now() - 60_000)
-            : fixture === "incoming"
-              ? incomingRows(Date.now() - 120_000)
-              : fixture === "link"
-                ? linkRows(Date.now() - 30_000)
-                : fixture === "organization"
-                  ? organizationRows(Date.now() - 120_000)
-                  : fixture === "shared"
-                    ? sharedRows(Date.now() - 720_000)
-                    : syntheticRows(Math.max(3, Math.floor(count)), fixture === "short" ? "short" : "mixed");
+        (fixture && Object.hasOwn(fixtures, fixture) ? fixtures[fixture]?.() : undefined) ??
+        syntheticRows(Math.max(3, Math.floor(count)), fixture === "short" ? "short" : "mixed");
       const start = performance.now();
       const committed = acpmuxPerf.nextCommit();
       host.replaceRows(rows);
