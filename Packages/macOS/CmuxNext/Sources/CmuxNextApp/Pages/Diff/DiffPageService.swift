@@ -5,6 +5,7 @@ import CmuxNextBridge
 import CmuxNextCompat
 import struct CmuxNextControl.LaunchIdentity
 import CmuxNextDesign
+import enum CmuxNextDaemon.DaemonCapability
 import enum CmuxNextDaemon.DaemonError
 import typealias CmuxNextDaemon.SurfaceID
 import class CmuxNextDaemon.TabModel
@@ -12,6 +13,7 @@ import CmuxNextDaemonService
 import CmuxNextDiff
 import CmuxNextIcons
 import CmuxNextPages
+import CmuxNextPullRequestDiff
 import CmuxNextSettings
 
 extension InternalPageID {
@@ -513,4 +515,27 @@ extension DiffRecents {
     /// Beside the build's daemon state, as SidebarSnapshotFile does (per-build isolation S5): never
     /// another build's tag folder.
     static func standardURL(launch: LaunchIdentity) -> URL { SidebarSnapshotFile.buildDirectory(launch: launch).appending(path: fileName) }
+}
+
+/// A pull request's Files tab link (`/pull/N/files`, Session Info's View diff) opens its diff beside
+/// the chat (``PullRequestDiff``). Every other github.com link, a pull request's own page included,
+/// opens github.com in the browser (Leo, 2026-11-06: "stop doing our own renderer for this").
+extension PullRequestDiff {
+    /// True when `url` is a Files tab link the link rule sends to a cmux tab: its diff opens
+    /// (else that web page). Nil leaves the link to its web page. `source`: the chat's pane.
+    @MainActor
+    static func openFiles(_ url: URL, from source: PaneController, services: AppServices) -> Bool? {
+        guard let link = GitHubLink(url), link.files,
+              LinkRouter.shared.target(for: url) == .cmuxBrowser, LinkRouter.shared.routing().browserEnabled,
+              source.daemon.supports(DaemonCapability.pageTabs.rawValue), case .connected = source.daemon.store.connectionState else { return nil }
+        let local = GitHubLocalDiff { [git = services.agentGit.local] in try? await git.read("git.diff", params: $0) }
+        PullRequestDiff(local: local, read: { await AgentChatPullRequestReader().diff(url: $0) }).open(link, openDiff: { [weak source, weak services] text in
+            guard let source, let services else { return }
+            services.viewers.diffPages.open(chatPatch: DiffChatPatch(text: text, folder: "/" + link.reference), in: source, focus: true)
+        }, openWeb: { [weak source, weak services] url in
+            guard let source, let services else { return }
+            _ = services.linkOpener.openWeb(url, from: source, background: false, reusesTab: true)
+        })
+        return true
+    }
 }
