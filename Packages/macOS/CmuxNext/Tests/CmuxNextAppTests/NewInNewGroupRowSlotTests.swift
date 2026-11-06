@@ -16,7 +16,7 @@ import Testing
 /// the new row only at the top.
 @MainActor @Suite(.serialized, .timeLimit(.minutes(3)), .enabled(if: SameTreeDaemonBinary.url != nil, "needs the same-tree cmux-tui"))
 struct NewInNewGroupRowSlotTests {
-    @Test func newWorkspaceInNewGroupDrawsItsRowOnlyAtTheTop() async throws {
+    @Test(arguments: 0..<5) func newWorkspaceInNewGroupDrawsItsRowOnlyAtTheTop(round: Int) async throws {
         let launched = try await RapidWorkspaceCreateTests.launch(sessionEvents: true)
         let services = launched.services
         let url = launched.root.appendingPathComponent("cmux.json")
