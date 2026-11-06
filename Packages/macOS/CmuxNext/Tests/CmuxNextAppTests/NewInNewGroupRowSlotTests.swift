@@ -57,6 +57,7 @@ struct NewInNewGroupRowSlotTests {
         let after = rows(list.displayed)
         await launched.stop()
 
+        print("ss6-diag: home \(String(describing: home)) top \(top) before \(before) after \(after) frames \(frames)")
         let created = try #require(after.first { !before.contains($0) }, "the new row: \(after)")
         // At the top: first below Home, or first when its group forms above Home.
         #expect((after.firstIndex(of: created) ?? .max) <= top, "rows \(before) became \(after)")
